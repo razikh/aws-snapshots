@@ -2,7 +2,7 @@
 
 # Author: Razikh Ulla (razikh@gmail.com)
 # (c) 2019
-# License: BSD
+
 
 import argparse
 import boto3
@@ -21,8 +21,7 @@ config_defaults = defaultdict(lambda: None, {
     'ec2_region_name': '',
     'tag_name': 'MakeSnapshot', #Edit this to name as per your requirement
     'tag_value': 'true',
-    'tag_type': 'volume', #It can be either volume or instance
-    'running_only': False, #Toggle to True to snapshots to be taken of only active instances/volumes
+    'tag_type': 'volume', #Snapshots are taken of Volume. These snapshots can be used to create image followed by Instances
     'keep_hour': 4, #Number of hourly snapshots to be maintained on the account
     'keep_day': 3,  #Number of daily snapshots to be maintained on the account
     'keep_week': 4, #Number of weekly snapshots to be maintained on the account
@@ -68,36 +67,34 @@ def dump_stats(stats):
 
 def read_config(defaults):
     new = defaults.copy()
-
-    # some config sanity checks
-    if not new['tag_type'] in ['volume', 'instance']:
-        log.warning("Unknown tag type: %s, resorting to default" %
-                    new['tag_type'])
-        new['tag_type'] = defaults['tag_type']
-
     return new
 
 
-def get_vols(ec2_resource, tag_name, tag_value, tag_type='volume', running_only=False):
+def get_vols(ec2_resource, tag_name, tag_value, tag_type):
     log.debug("looking for tags of type %s " % tag_type)
     if tag_type == 'volume':
         vols = ec2_resource.volumes.filter(
             Filters=[{'Name': 'tag:' + tag_name, 'Values': [tag_value]}]).all()
+        print vols
         return vols
     elif tag_type == 'instance':
+        #instance_filters = [{'Name': 'tag:' + tag_name, 'Values': [tag_value]}]
         instance_filters = [{'Name': 'tag:' + tag_name, 'Values': [tag_value]}]
-        if running_only:
-            instance_filters.append(
-                {'Name': 'instance-state-name', 'Values': ['running']})
+        print "Entering the block"
+       
         instances = ec2_resource.instances.filter(
             Filters=instance_filters).all()
-
+        print "print instances"
+        print instances
         instance_ids = []
         for instance in instances:
+            print "for loop"
             instance_ids.append(instance.id)
+            print instance_id
         vols = ec2_resource.volumes.filter(Filters=[
             {'Name': 'attachment.instance-id', 'Values': instance_ids}
         ]).all()
+        
         return vols
     else:
         # reserved for new tag types
@@ -173,8 +170,11 @@ def main(period):
     try:
         ec2 = boto3.resource('ec2', region_name=ec2_region)
         vols = get_vols(ec2_resource=ec2, tag_name=config['tag_name'], tag_value=config[
-                        'tag_value'], tag_type=config['tag_type'], running_only=config['running_only'])
+                        'tag_value'], tag_type=config['tag_type'])
+        print "calling get vols"
+        print vols
         for vol in vols:
+            print "Inside for loop"
             log.info("Processing volume %s:", vol.id)
             stats['total_vols'] += 1
             description = '%(period)s_snapshot %(vol_id)s_%(period)s_%(date_suffix)s by snapshot script at %(date)s' % {
