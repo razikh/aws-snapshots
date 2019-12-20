@@ -2,6 +2,7 @@
 
 # Author: Razikh Ulla (razikh@gmail.com)
 # (c) 2019
+# License: MIT
 
 
 import argparse
